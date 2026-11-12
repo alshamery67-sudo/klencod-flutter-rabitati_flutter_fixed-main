@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>متجري الذكي | رابطتي</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+:root{--navy:#111827;--pink:#ec4899;--bg:#f4f6fb;--muted:#64748b;--line:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:'Cairo',sans-serif;color:#172033}
+header{background:linear-gradient(120deg,#111827,#26334d);color:#fff;padding:22px 5%;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+header h1{font-size:22px;margin:0}header p{margin:4px 0 0;color:#cbd5e1;font-size:13px}
+.wrap{max-width:1100px;margin:24px auto;padding:0 16px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 5px 18px #0f172a08}
+.stat small{color:var(--muted)}.stat strong{display:block;font-size:25px;margin-top:6px}
+.layout{display:grid;grid-template-columns: minmax(260px, .8fr) 1.4fr;gap:16px}
+h2{font-size:17px;margin:0 0 14px}.field{margin:10px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:5px}
+input,textarea,select{width:100%;border:1px solid #d8deea;border-radius:10px;padding:11px;font:inherit;background:#fff}
+textarea{min-height:85px;resize:vertical}
+button{border:0;border-radius:10px;padding:10px 15px;font:inherit;font-weight:700;cursor:pointer}
+.primary{background:var(--pink);color:white}.secondary{background:#eef2f7;color:#26334d}.danger{background:#fee2e2;color:#991b1b}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;padding:11px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:700}
+.empty{text-align:center;color:var(--muted);padding:25px}
+.notice{font-size:12px;color:var(--muted);line-height:1.8;margin-top:12px}
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;background:#fce7f3;color:#9d174d;font-size:11px}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.stats .card:last-child{grid-column:1/-1}header{padding:18px}}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>متجري الذكي</h1><p>لوحة إدارة المنتجات الرقمية — رابطتي / السويدي بروبنت</p></div>
+ <span class="pill">نسخة أولية قابلة للتطوير</span>
+</header>
+<main class="wrap">
+ <section class="stats">
+  <div class="card stat"><small>عدد المنتجات</small><strong id="countProducts">0</strong></div>
+  <div class="card stat"><small>قيمة المنتجات المعروضة</small><strong id="totalValue">0 ر.ي</strong></div>
+  <div class="card stat"><small>العملة</small><strong>الريال اليمني</strong></div>
+ </section>
+ <section class="layout">
+  <div class="card">
+   <h2 id="formTitle">إضافة منتج رقمي</h2>
+   <form id="productForm">
+    <input type="hidden" id="editId">
+    <div class="field"><label for="name">اسم المنتج</label><input id="name" required maxlength="100" placeholder="مثال: دليل التجارة الرقمية"></div>
+    <div class="field"><label for="description">وصف المنتج</label><textarea id="description" placeholder="اكتب وصفاً واضحاً ومفيداً للعميل"></textarea></div>
+    <div class="field"><label for="price">السعر بالريال اليمني</label><input id="price" type="number" min="0" step="1" required placeholder="500"></div>
+    <div class="field"><label for="fileName">اسم ملف PDF (اختياري)</label><input id="fileName" placeholder="guide.pdf"></div>
+    <div class="actions"><button class="primary" type="submit">حفظ المنتج</button><button class="secondary" type="reset" id="cancelEdit">مسح الحقول</button></div>
+   </form>
+   <p class="notice">هذه النسخة تحفظ بياناتها داخل متصفح الجهاز فقط. لا تضع مفاتيح API أو كلمات مرور هنا. الربط الفعلي بقاعدة بيانات المتجر والدفع والنشر يحتاج إعداد خادم آمن.</p>
+  </div>
+  <div class="card">
+   <h2>إدارة المنتجات</h2>
+   <div style="overflow-x:auto">
+    <table><thead><tr><th>المنتج</th><th>السعر</th><th>الملف</th><th>الإجراءات</th></tr></thead><tbody id="productsBody"></tbody></table>
+    <div id="empty" class="empty">لا توجد منتجات بعد. أضف أول منتج من النموذج.</div>
+   </div>
+  </div>
+ </section>
+</main>
+<script>
+const KEY='rabitati_smart_manager_products_v1';
+let products=[];
+try { products=JSON.parse(localStorage.getItem(KEY)||'[]'); if(!Array.isArray(products)) products=[]; } catch(e){ products=[]; }
+const $=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat('ar-YE').format(Number(n)||0)+' ر.ي';
+function persist(){localStorage.setItem(KEY,JSON.stringify(products));render();}
+function safe(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){
+ $('countProducts').textContent=products.length;
+ $('totalValue').textContent=money(products.reduce((a,p)=>a+(Number(p.price)||0),0));
+ $('empty').style.display=products.length?'none':'block';
+ $('productsBody').innerHTML=products.map(p=>`<tr><td><strong>${safe(p.name)}</strong><br><span style="color:#64748b">${safe(p.description||'')}</span></td><td>${money(p.price)}</td><td>${safe(p.fileName||'—')}</td><td><div class="actions"><button class="secondary" onclick="editProduct('${p.id}')">تعديل</button><button class="danger" onclick="deleteProduct('${p.id}')">حذف</button></div></td></tr>`).join('');
+}
+$('productForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const id=$('editId').value;
+ const item={id:id||String(Date.now()),name:$('name').value.trim(),description:$('description').value.trim(),price:Number($('price').value),fileName:$('fileName').value.trim()};
+ if(!item.name||!Number.isFinite(item.price)||item.price<0)return;
+ if(id){products=products.map(p=>p.id===id?item:p);}else{products.unshift(item);}
+ $('productForm').reset();$('editId').value='';$('formTitle').textContent='إضافة منتج رقمي';persist();
+});
+window.editProduct=id=>{
+ const p=products.find(x=>x.id===id);if(!p)return;
+ $('editId').value=p.id;$('name').value=p.name;$('description').value=p.description||'';$('price').value=p.price;$('fileName').value=p.fileName||'';
+ $('formTitle').textContent='تعديل المنتج';window.scrollTo({top:0,behavior:'smooth'});
+};
+window.deleteProduct=id=>{
+ if(!confirm('هل تريد حذف هذا المنتج من بيانات هذه اللوحة؟'))return;
+ products=products.filter(p=>p.id!==id);persist();
+};
+$('cancelEdit').addEventListener('click',()=>{setTimeout(()=>{$('editId').value='';$('formTitle').textContent='إضافة منتج رقمي';},0)});
+render();
+</script>
+</body></html>
